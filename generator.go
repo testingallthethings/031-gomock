@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+//go:generate mockgen --destination=./mocks/applicant.go drivinglicence Applicant
 type Applicant interface {
 	IsOver17() bool
 	HoldsLicence() bool
@@ -12,10 +13,12 @@ type Applicant interface {
 	GetDOB() string
 }
 
+//go:generate mockgen --destination=./mocks/logger.go drivinglicence Logger
 type Logger interface {
 	LogStuff(v string)
 }
 
+//go:generate mockgen --destination=./mocks/generator.go drivinglicence RandomNumbersGenerator
 type RandomNumbersGenerator interface {
 	GetRandomNumbers(len int) string
 }

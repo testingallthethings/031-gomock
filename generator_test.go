@@ -2,47 +2,64 @@ package drivinglicence_test
 
 import (
 	"drivinglicence"
+	mock_drivinglicence "drivinglicence/mocks"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
-	"strings"
 	"testing"
 )
 
-func (s *DrivingLicenceSuite) TestUnderageApplicant() {
- 	a := UnderageApplicant{}
- 	l := &SpyLogger{}
-	r := FakeRand{}
+var ctrl *gomock.Controller
+var a *mock_drivinglicence.MockApplicant
+var l *mock_drivinglicence.MockLogger
+var r *mock_drivinglicence.MockRandomNumbersGenerator
 
- 	lg := drivinglicence.NewNumberGenerator(l, r)
+var lg drivinglicence.NumberGenerator
+
+func (s *DrivingLicenceSuite) SetupTest() {
+	ctrl = gomock.NewController(s.T())
+
+	a = mock_drivinglicence.NewMockApplicant(ctrl)
+	l = mock_drivinglicence.NewMockLogger(ctrl)
+	r = mock_drivinglicence.NewMockRandomNumbersGenerator(ctrl)
+
+	lg = drivinglicence.NewNumberGenerator(l, r)
+}
+
+func (s *DrivingLicenceSuite) TearDownTest() {
+	ctrl.Finish()
+}
+
+func (s *DrivingLicenceSuite) TestUnderageApplicant() {
+	a.EXPECT().IsOver17().Return(false)
+	a.EXPECT().HoldsLicence().Return(false)
+
+ 	l.EXPECT().LogStuff("Underaged Applicant, you must be 17 for a licence").Times(1)
+
  	_, err := lg.Generate(a)
 
  	s.Error(err)
 	s.Contains(err.Error(), "Underaged")
-
- 	s.Equal(1, l.callCount)
- 	s.Contains(l.lastMessage, "Underaged")
 }
 
 func (s *DrivingLicenceSuite) TestNoSecondLicence() {
-	a := LicenceHolderApplicant{}
-	l := &SpyLogger{}
-	r := FakeRand{}
+	a.EXPECT().HoldsLicence().Return(true)
 
-	lg := drivinglicence.NewNumberGenerator(l, r)
+	l.EXPECT().LogStuff("Duplicate Applicant, you can only hold one licence").Times(1)
+
 	_, err := lg.Generate(a)
 
 	s.Error(err)
 	s.Contains(err.Error(), "Duplicate")
-
-	s.Equal(1, l.callCount)
-	s.Contains(l.lastMessage, "Duplicate")
 }
 
 func (s *DrivingLicenceSuite) TestLicenceGeneration() {
-	a := ValidApplicant{"MDB", "23082011"}
-	l := &SpyLogger{}
-	r := FakeRand{}
+	a.EXPECT().HoldsLicence().Return(false)
+	a.EXPECT().IsOver17().Return(true)
+	a.EXPECT().GetInitials().Return("MDB")
+	a.EXPECT().GetDOB().Return("23082011")
 
-	lg := drivinglicence.NewNumberGenerator(l, r)
+	r.EXPECT().GetRandomNumbers(5).Return("00000")
+
 	ln, err := lg.Generate(a)
 
 	s.NoError(err)
@@ -50,11 +67,13 @@ func (s *DrivingLicenceSuite) TestLicenceGeneration() {
 }
 
 func (s *DrivingLicenceSuite) TestLicenceGenerationShorterInitials() {
-	a := ValidApplicant{"MB", "23082011"}
-	l := &SpyLogger{}
-	r := FakeRand{}
+	a.EXPECT().HoldsLicence().Return(false)
+	a.EXPECT().IsOver17().Return(true)
+	a.EXPECT().GetInitials().Return("MB")
+	a.EXPECT().GetDOB().Return("23082011")
 
-	lg := drivinglicence.NewNumberGenerator(l, r)
+	r.EXPECT().GetRandomNumbers(6).Return("000000")
+
 	ln, err := lg.Generate(a)
 
 	s.NoError(err)
@@ -68,79 +87,3 @@ type DrivingLicenceSuite struct {
 func TestDrivingLicenceSuite(t *testing.T) {
 	suite.Run(t, new(DrivingLicenceSuite))
 }
-
-type UnderageApplicant struct {}
-
-func (u UnderageApplicant) GetDOB() string {
-	return ""
-}
-
-func (u UnderageApplicant) GetInitials() string {
-	return ""
-}
-
-func (u UnderageApplicant) IsOver17() bool {
-	return false
-}
-
-func (u UnderageApplicant) HoldsLicence() bool {
-	return false
-}
-
-type LicenceHolderApplicant struct {}
-
-func (l LicenceHolderApplicant) IsOver17() bool {
-	return true
-}
-
-func (l LicenceHolderApplicant) HoldsLicence() bool {
-	return true
-}
-
-func (l LicenceHolderApplicant) GetInitials() string {
-	return ""
-}
-
-func (l LicenceHolderApplicant) GetDOB() string {
-	return ""
-}
-
-type ValidApplicant struct {
-	initials string
-	dob string
-}
-
-func (v ValidApplicant) IsOver17() bool {
-	return true
-}
-
-func (v ValidApplicant) HoldsLicence() bool {
-	return false
-}
-
-func (v ValidApplicant) GetInitials() string {
-	return v.initials
-}
-
-func (v ValidApplicant) GetDOB() string {
-	return v.dob
-}
-
-type FakeRand struct {}
-
-func (f FakeRand) GetRandomNumbers(len int) string {
-	return strings.Repeat("0", len)
-}
-
-type SpyLogger struct {
-	callCount int
-	lastMessage string
-}
-
-func (s *SpyLogger) LogStuff(v string) {
-	s.callCount++
-	s.lastMessage = v
-}
-
-
-
